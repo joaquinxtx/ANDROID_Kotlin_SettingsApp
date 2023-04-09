@@ -3,6 +3,9 @@ package com.example.settingsactivity
 import android.content.Context
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+import androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -12,7 +15,10 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.example.settingsactivity.databinding.ActivityMainBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -28,11 +34,27 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
+    private var firstTime:Boolean = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        getSettings()
+        CoroutineScope(Dispatchers.IO).launch {
+            getSettings().filter{firstTime}.collect { settingsModel ->
+                if (settingsModel != null) {
+                    runOnUiThread {
+                        binding.switchVibration.isChecked = settingsModel.vibration
+                        binding.switchBluetooth.isChecked = settingsModel.bluetooth
+                        binding.switchDarkMode.isChecked = settingsModel.darkMode
+                        binding.sliderVolume.setValues(settingsModel.volume.toFloat())
+                        firstTime=!firstTime
+                    }
+                }
+
+            }
+
+        }
         initUI()
     }
 
@@ -50,6 +72,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         binding.switchDarkMode.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked){
+                enableDarkMode()
+            }else{
+                disableDarkMode()
+            }
             CoroutineScope(Dispatchers.IO).launch {
                 saveOptions(KEY_DARK_MODE, isChecked)
 
@@ -85,6 +112,16 @@ class MainActivity : AppCompatActivity() {
             )
 
         }
+    }
+
+    private fun enableDarkMode(){
+        AppCompatDelegate.setDefaultNightMode(MODE_NIGHT_YES)
+        delegate.applyDayNight()
+    }
+
+    private fun disableDarkMode(){
+        AppCompatDelegate.setDefaultNightMode(MODE_NIGHT_NO)
+        delegate.applyDayNight()
     }
 }
 
